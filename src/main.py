@@ -73,16 +73,9 @@ async def lifespan(app: FastAPI):
 
     # Start file cache cleanup task
     await generation_handler.file_cache.start_cleanup_task()
-
     
 
-    print(f"✓ Database initialized")
-    print(f"✓ Total tokens: {len(tokens)}")
-    print(f"✓ Cache: {'Enabled' if config.cache_enabled else 'Disabled'} (timeout: {config.cache_timeout}s)")
-    print(f"✓ File cache cleanup task started")
-    print(f"✓ Server running on http://{config.server_host}:{config.server_port}")
-    print("=" * 60)
-
+    
     yield
 
     # Shutdown
