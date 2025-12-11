@@ -179,5 +179,10 @@ class Config:
             self._config["cache"] = {}
         self._config["cache"]["base_url"] = base_url
 
+    @property
+    def token_refresh_interval(self) -> int:
+        """Get token refresh interval in seconds"""
+        return self._config.get("token_refresh", {}).get("interval", 3600)
+
 # Global config instance
 config = Config()

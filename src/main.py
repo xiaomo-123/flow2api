@@ -17,6 +17,7 @@ from .services.generation_handler import GenerationHandler
 from .api import routes, admin
 
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
@@ -73,6 +74,8 @@ async def lifespan(app: FastAPI):
     # Start file cache cleanup task
     await generation_handler.file_cache.start_cleanup_task()
 
+    
+
     print(f"✓ Database initialized")
     print(f"✓ Total tokens: {len(tokens)}")
     print(f"✓ Cache: {'Enabled' if config.cache_enabled else 'Disabled'} (timeout: {config.cache_timeout}s)")
@@ -87,6 +90,13 @@ async def lifespan(app: FastAPI):
     # Stop file cache cleanup task
     await generation_handler.file_cache.stop_cleanup_task()
     print("✓ File cache cleanup task stopped")
+
+    # Stop token refresh scheduler if running
+    if hasattr(app.state, 'token_refresh_scheduler'):
+        scheduler = app.state.token_refresh_scheduler
+        if scheduler and scheduler.enabled:
+            await scheduler.stop()
+            print("✓ Token refresh scheduler stopped")
 
 
 # Initialize components
@@ -105,10 +115,6 @@ generation_handler = GenerationHandler(
     proxy_manager  # 添加 proxy_manager 参数
 )
 
-# Set dependencies
-routes.set_generation_handler(generation_handler)
-admin.set_dependencies(token_manager, proxy_manager, db)
-
 # Create FastAPI app
 app = FastAPI(
     title="Flow2API",
@@ -116,6 +122,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Set dependencies
+routes.set_generation_handler(generation_handler)
+admin.set_dependencies(token_manager, proxy_manager, db, app)
 
 # CORS middleware
 app.add_middleware(

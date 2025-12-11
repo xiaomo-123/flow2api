@@ -15,17 +15,19 @@ router = APIRouter()
 token_manager: TokenManager = None
 proxy_manager: ProxyManager = None
 db: Database = None
+app = None  # FastAPI app instance
 
 # Store active admin session tokens (in production, use Redis or database)
 active_admin_tokens = set()
 
 
-def set_dependencies(tm: TokenManager, pm: ProxyManager, database: Database):
+def set_dependencies(tm: TokenManager, pm: ProxyManager, database: Database, app_instance=None):
     """Set service instances"""
-    global token_manager, proxy_manager, db
+    global token_manager, proxy_manager, db, app
     token_manager = tm
     proxy_manager = pm
     db = database
+    app = app_instance
 
 
 # ========== Request Models ==========
@@ -233,6 +235,73 @@ async def add_token(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"添加Token失败: {str(e)}")
 
+@router.post("/api/tokens/import")
+async def import_tokens(
+    request: dict,
+    token: str = Depends(verify_admin_token)
+):
+    """导入 Token 列表"""
+    try:
+        tokens_data = request.get("tokens", [])
+        if not isinstance(tokens_data, list):
+            raise HTTPException(status_code=400, detail="tokens 必须是数组")
+        
+        added_count = 0
+        updated_count = 0
+        errors = []
+        
+        for token_data in tokens_data:
+            try:
+                # 检查必需字段
+                if not token_data.get("session_token"):
+                    errors.append(f"Token 缺少 session_token: {token_data.get('email', '未知邮箱')}")
+                    continue
+                
+                # 检查是否已存在
+                existing_token = await token_manager.db.get_token_by_st(token_data["session_token"])
+                
+                if existing_token:
+                    # 更新现有 Token
+                    await token_manager.update_token(
+                        token_id=existing_token.id,
+                        st=token_data.get("session_token"),
+                        at=token_data.get("access_token"),
+                        project_id=token_data.get("project_id"),
+                        project_name=token_data.get("project_name"),
+                        remark=token_data.get("remark"),
+                        image_enabled=token_data.get("image_enabled", True),
+                        video_enabled=token_data.get("video_enabled", True),
+                        image_concurrency=token_data.get("image_concurrency", -1),
+                        video_concurrency=token_data.get("video_concurrency", -1)
+                    )
+                    updated_count += 1
+                else:
+                    # 添加新 Token
+                    await token_manager.add_token(
+                        st=token_data["session_token"],
+                        project_id=token_data.get("project_id"),
+                        project_name=token_data.get("project_name"),
+                        remark=token_data.get("remark"),
+                        image_enabled=token_data.get("image_enabled", True),
+                        video_enabled=token_data.get("video_enabled", True),
+                        image_concurrency=token_data.get("image_concurrency", -1),
+                        video_concurrency=token_data.get("video_concurrency", -1)
+                    )
+                    added_count += 1
+                    
+            except Exception as e:
+                errors.append(f"处理 Token 失败 ({token_data.get('email', '未知邮箱')}): {str(e)}")
+        
+        return {
+            "success": True,
+            "message": "导入完成",
+            "added": added_count,
+            "updated": updated_count,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
 
 @router.put("/api/tokens/{token_id}")
 async def update_token(
@@ -630,23 +699,71 @@ async def update_generation_timeout(
 
 @router.get("/api/token-refresh/config")
 async def get_token_refresh_config(token: str = Depends(verify_admin_token)):
-    """Get AT auto refresh configuration (默认启用)"""
+    """Get AT auto refresh configuration"""
+    config = await db.get_token_refresh_config()
+
+    # 检查定时任务状态
+    
+
+    # 获取自动刷新配置
+    at_auto_refresh_enabled = config.at_auto_refresh_enabled if config else True
+
+    # 检查定时任务状态
+    scheduler_running = False
+    if app and hasattr(app.state, 'token_refresh_scheduler'):
+        scheduler = app.state.token_refresh_scheduler
+        scheduler_running = scheduler.enabled if scheduler else False
+        # 检查任务是否真的在运行
+        if scheduler.task:
+            scheduler_running = not scheduler.task.done() and scheduler.enabled
+
+    # 如果配置为启用但定时任务未运行，则启动定时任务
+    if at_auto_refresh_enabled and not scheduler_running:
+        from ..services.token_refresh_scheduler import TokenRefreshScheduler
+        if not hasattr(app.state, 'token_refresh_scheduler'):
+            app.state.token_refresh_scheduler = TokenRefreshScheduler(db.db_path)
+        scheduler = app.state.token_refresh_scheduler
+        await scheduler.start()
+        scheduler_running = True
+
     return {
         "success": True,
         "config": {
-            "at_auto_refresh_enabled": True  # Flow2API默认启用AT自动刷新
+            "at_auto_refresh_enabled": at_auto_refresh_enabled,
+            "scheduler_running": scheduler_running
         }
     }
 
 
 @router.post("/api/token-refresh/enabled")
 async def update_token_refresh_enabled(
+    request: dict,
     token: str = Depends(verify_admin_token)
 ):
-    """Update AT auto refresh enabled (Flow2API固定启用,此接口仅用于前端兼容)"""
+    """Update AT auto refresh enabled"""
+    enabled = request.get("enabled", True)
+
+    # 更新数据库配置
+    await db.update_token_refresh_config(enabled)
+   
+
+    # 控制定时任务
+    from ..services.token_refresh_scheduler import TokenRefreshScheduler
+
+    # 获取或创建调度器实例
+    if not hasattr(app.state, 'token_refresh_scheduler'):
+        app.state.token_refresh_scheduler = TokenRefreshScheduler(db.db_path)
+
+    scheduler = app.state.token_refresh_scheduler
+
+    if enabled:
+        await scheduler.start()
+    else:
+        await scheduler.stop()
+
     return {
         "success": True,
-        "message": "Flow2API的AT自动刷新默认启用且无法关闭"
+        "message": f"AT自动刷新已{'启用' if enabled else '禁用'}"
     }
 
 

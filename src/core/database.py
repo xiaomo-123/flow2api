@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
-from .models import Token, TokenStats, Task, RequestLog, AdminConfig, ProxyConfig, GenerationConfig, CacheConfig, Project
+from .models import Token, TokenStats, Task, RequestLog, AdminConfig, ProxyConfig, GenerationConfig, CacheConfig, Project, TokenRefreshConfig
 
 
 class Database:
@@ -17,6 +17,43 @@ class Database:
             data_dir.mkdir(exist_ok=True)
             db_path = str(data_dir / "flow.db")
         self.db_path = db_path
+
+    # Import token refresh config methods
+    from .database_methods import get_token_refresh_config, update_token_refresh_config
+
+    async def init_db(self):
+        """Initialize database with tables and default data"""
+        # First, create the database if it doesn't exist
+        if not self.db_exists():
+            await self.create_db()
+
+        # Ensure token_refresh_config table exists and has a row
+        async with aiosqlite.connect(self.db_path) as db:
+            # Check if table exists
+            cursor = await db.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='token_refresh_config'
+            """)
+            table_exists = await cursor.fetchone()
+
+            if not table_exists:
+                # Create table
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS token_refresh_config (
+                        id INTEGER PRIMARY KEY DEFAULT 1,
+                        at_auto_refresh_enabled BOOLEAN DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # Insert default row
+                await db.execute("""
+                    INSERT INTO token_refresh_config (id, at_auto_refresh_enabled)
+                    VALUES (1, 1)
+                """)
+
+                await db.commit()
 
     def db_exists(self) -> bool:
         """Check if database file exists"""
@@ -148,6 +185,21 @@ class Database:
                 VALUES (1, ?, ?, ?, ?)
             """, (debug_enabled, log_requests, log_responses, mask_token))
 
+        # Ensure token_refresh_config has a row
+        cursor = await db.execute("SELECT COUNT(*) FROM token_refresh_config")
+        count = await cursor.fetchone()
+        if count[0] == 0:
+            at_auto_refresh_enabled = True
+
+            if config_dict:
+                token_refresh_config = config_dict.get("token_refresh", {})
+                at_auto_refresh_enabled = token_refresh_config.get("at_auto_refresh_enabled", True)
+
+            await db.execute("""
+                INSERT INTO token_refresh_config (id, at_auto_refresh_enabled)
+                VALUES (1, ?)
+            """, (at_auto_refresh_enabled,))
+
     async def check_and_migrate_db(self, config_dict: dict = None):
         """Check database integrity and perform migrations if needed
 
@@ -177,6 +229,24 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
+                """)
+
+            # Check and create token_refresh_config table if missing
+            if not await self._table_exists(db, "token_refresh_config"):
+                print("  ✓ Creating missing table: token_refresh_config")
+                await db.execute("""
+                    CREATE TABLE token_refresh_config (
+                        id INTEGER PRIMARY KEY DEFAULT 1,
+                        at_auto_refresh_enabled BOOLEAN DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
+                # Insert default row
+                await db.execute("""
+                    INSERT INTO token_refresh_config (id, at_auto_refresh_enabled)
+                    VALUES (1, 1)
                 """)
 
             # ========== Step 2: Add missing columns to existing tables ==========
@@ -386,6 +456,16 @@ class Database:
                     log_requests BOOLEAN DEFAULT 1,
                     log_responses BOOLEAN DEFAULT 1,
                     mask_token BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Token refresh config table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS token_refresh_config (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    at_auto_refresh_enabled BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )

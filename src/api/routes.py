@@ -1,4 +1,5 @@
 """API routes - OpenAI compatible endpoints"""
+from urllib3 import request
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List
@@ -13,12 +14,28 @@ router = APIRouter()
 
 # Dependency injection will be set up in main.py
 generation_handler: GenerationHandler = None
+proxy_manager = None
 
 
 def set_generation_handler(handler: GenerationHandler):
     """Set generation handler instance"""
     global generation_handler
     generation_handler = handler
+
+
+def set_proxy_manager(manager):
+    """Set proxy manager instance"""
+    global proxy_manager
+    proxy_manager = manager
+
+
+@router.get("/v1/proxy/status")
+async def get_proxy_status(api_key: str = Depends(verify_api_key_header)):
+    """获取代理状态"""
+    if proxy_manager:
+        await proxy_manager.print_proxy_status()
+        return {"status": "success", "message": "代理状态已打印到控制台"}
+    return {"status": "error", "message": "代理管理器未初始化"}
 
 
 @router.get("/v1/models")
@@ -56,7 +73,7 @@ async def create_chat_completion(
         # Extract prompt from messages
         if not request.messages:
             raise HTTPException(status_code=400, detail="Messages cannot be empty")
-
+        print("请求消息: ", request.messages)
         last_message = request.messages[-1]
         content = last_message.content
 

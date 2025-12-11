@@ -258,11 +258,12 @@ class TokenManager:
                 return False
 
             try:
-                debug_logger.log_info(f"[AT_REFRESH] Token {token_id}: 开始刷新AT...")
-
+                
+                print(f"[AT_REFRESH] Token {token_id}: 开始刷新AT...")
                 # 使用ST转AT
                 result = await self.flow_client.st_to_at(token.st)
-                new_at = result["access_token"]
+                
+                new_at = result["access_token"]                
                 expires = result.get("expires")
 
                 # 解析过期时间

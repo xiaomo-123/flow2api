@@ -130,6 +130,10 @@
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-border">
+                                <th class="h-10 px-3 text-center align-middle font-medium text-muted-foreground">
+                                    <input type="checkbox" id="selectAllTokens" onchange="toggleSelectAll()" class="h-4 w-4 rounded border-input">
+                                </th>
+                                <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground">ID</th>
                                 <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground">邮箱</th>
                                 <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground">状态</th>
                                 <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground">过期时间</th>
@@ -538,10 +542,85 @@
         formatPlanTypeWithTooltip=(t)=>{const tooltipText=t.subscription_end?`套餐到期: ${new Date(t.subscription_end).toLocaleDateString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-')} ${new Date(t.subscription_end).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})}`:'';return`<span class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-blue-50 text-blue-700 cursor-pointer" title="${tooltipText||t.plan_title||'-'}">${formatPlanType(t.plan_type)}</span>`},
         formatSora2Remaining=(t)=>{if(t.sora2_supported===true){const remaining=t.sora2_remaining_count||0;return`<span class="text-xs">${remaining}</span>`}else{return'-'}},
         formatAccountType=(tier)=>{if(tier==='PAYGATE_TIER_NOT_PAID'){return`<span class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-gray-100 text-gray-700">普通</span>`}else{return`<span class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-purple-50 text-purple-700">会员</span>`}},
-        renderTokens=()=>{const tb=$('tokenTableBody');tb.innerHTML=allTokens.map(t=>{const imageDisplay=t.image_enabled?`${t.image_count||0}`:'-';const videoDisplay=t.video_enabled?`${t.video_count||0}`:'-';const creditsDisplay=t.credits!==undefined?`${t.credits}`:'-';const accountTypeDisplay=formatAccountType(t.user_paygate_tier);const projectDisplay=t.current_project_name||'-';const projectIdDisplay=t.current_project_id?(t.current_project_id.length>5?`<span class="cursor-pointer text-blue-600 hover:text-blue-700" onclick="copyProjectId('${t.current_project_id}')" title="${t.current_project_id}">${t.current_project_id.substring(0,5)}...</span>`:`<span class="cursor-pointer text-blue-600 hover:text-blue-700" onclick="copyProjectId('${t.current_project_id}')" title="${t.current_project_id}">${t.current_project_id}</span>`):'-';const expiryDisplay=formatExpiry(t.at_expires);return`<tr><td class="py-2.5 px-3">${t.email}</td><td class="py-2.5 px-3"><span class="inline-flex items-center rounded px-2 py-0.5 text-xs ${t.is_active?'bg-green-50 text-green-700':'bg-gray-100 text-gray-700'}">${t.is_active?'活跃':'禁用'}</span></td><td class="py-2.5 px-3 text-xs">${expiryDisplay}</td><td class="py-2.5 px-3"><button onclick="refreshTokenCredits(${t.id})" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm" title="点击刷新余额"><span>${creditsDisplay}</span><svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><path d="M15 4.5l3.5 3.5L22 4.5"/></svg></button></td><td class="py-2.5 px-3">${accountTypeDisplay}</td><td class="py-2.5 px-3 text-xs">${projectDisplay}</td><td class="py-2.5 px-3 text-xs">${projectIdDisplay}</td><td class="py-2.5 px-3">${imageDisplay}</td><td class="py-2.5 px-3">${videoDisplay}</td><td class="py-2.5 px-3">${t.error_count||0}</td><td class="py-2.5 px-3 text-xs text-muted-foreground">${t.remark||'-'}</td><td class="py-2.5 px-3 text-right"><button onclick="refreshTokenAT(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-blue-50 hover:text-blue-700 h-7 px-2 text-xs mr-1" title="刷新AT">更新</button><button onclick="openEditModal(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-green-50 hover:text-green-700 h-7 px-2 text-xs mr-1">编辑</button><button onclick="toggleToken(${t.id},${t.is_active})" class="inline-flex items-center justify-center rounded-md hover:bg-accent h-7 px-2 text-xs mr-1">${t.is_active?'禁用':'启用'}</button><button onclick="deleteToken(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive h-7 px-2 text-xs">删除</button></td></tr>`}).join('')},
+        renderTokens=()=>{const tb=$('tokenTableBody');tb.innerHTML=allTokens.map(t=>{const imageDisplay=t.image_enabled?`${t.image_count||0}`:'-';const videoDisplay=t.video_enabled?`${t.video_count||0}`:'-';const creditsDisplay=t.credits!==undefined?`${t.credits}`:'-';const accountTypeDisplay=formatAccountType(t.user_paygate_tier);const projectDisplay=t.current_project_name||'-';const projectIdDisplay=t.current_project_id?(t.current_project_id.length>5?`<span class="cursor-pointer text-blue-600 hover:text-blue-700" onclick="copyProjectId('${t.current_project_id}')" title="${t.current_project_id}">${t.current_project_id.substring(0,5)}...</span>`:`<span class="cursor-pointer text-blue-600 hover:text-blue-700" onclick="copyProjectId('${t.current_project_id}')" title="${t.current_project_id}">${t.current_project_id}</span>`):'-';const expiryDisplay=formatExpiry(t.at_expires);return`<tr><td class="py-2.5 px-3 text-center"><input type="checkbox" class="token-checkbox h-4 w-4 rounded border-input" value="${t.id}" onchange="updateSelectAllStatus()"></td><td class="py-2.5 px-3 text-xs font-mono">${t.id}</td><td class="py-2.5 px-3">${t.email}</td><td class="py-2.5 px-3"><span class="inline-flex items-center rounded px-2 py-0.5 text-xs ${t.is_active?'bg-green-50 text-green-700':'bg-gray-100 text-gray-700'}">${t.is_active?'活跃':'禁用'}</span></td><td class="py-2.5 px-3 text-xs">${expiryDisplay}</td><td class="py-2.5 px-3"><button onclick="refreshTokenCredits(${t.id})" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm" title="点击刷新余额"><span>${creditsDisplay}</span><svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><path d="M15 4.5l3.5 3.5L22 4.5"/></svg></button></td><td class="py-2.5 px-3">${accountTypeDisplay}</td><td class="py-2.5 px-3 text-xs">${projectDisplay}</td><td class="py-2.5 px-3 text-xs">${projectIdDisplay}</td><td class="py-2.5 px-3">${imageDisplay}</td><td class="py-2.5 px-3">${videoDisplay}</td><td class="py-2.5 px-3">${t.error_count||0}</td><td class="py-2.5 px-3 text-xs text-muted-foreground">${t.remark||'-'}</td><td class="py-2.5 px-3 text-right"><button onclick="refreshTokenAT(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-blue-50 hover:text-blue-700 h-7 px-2 text-xs mr-1" title="刷新AT">更新</button><button onclick="openEditModal(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-green-50 hover:text-green-700 h-7 px-2 text-xs mr-1">编辑</button><button onclick="toggleToken(${t.id},${t.is_active})" class="inline-flex items-center justify-center rounded-md hover:bg-accent h-7 px-2 text-xs mr-1">${t.is_active?'禁用':'启用'}</button><button onclick="deleteToken(${t.id})" class="inline-flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive h-7 px-2 text-xs">删除</button></td></tr>`}).join('')},
         refreshTokenCredits=async(id)=>{try{showToast('正在刷新余额...','info');const r=await apiRequest(`/api/tokens/${id}/refresh-credits`,{method:'POST'});if(!r)return;const d=await r.json();if(d.success){showToast(`余额刷新成功: ${d.credits}`,'success');await refreshTokens()}else{showToast('刷新失败: '+(d.detail||'未知错误'),'error')}}catch(e){showToast('刷新失败: '+e.message,'error')}},
         refreshTokenAT=async(id)=>{try{showToast('正在更新AT...','info');const r=await apiRequest(`/api/tokens/${id}/refresh-at`,{method:'POST'});if(!r)return;const d=await r.json();if(d.success){const expiresDate=d.token.at_expires?new Date(d.token.at_expires):null;const expiresStr=expiresDate?expiresDate.toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).replace(/\//g,'-'):'未知';showToast(`AT更新成功! 新过期时间: ${expiresStr}`,'success');await refreshTokens()}else{showToast('更新失败: '+(d.detail||'未知错误'),'error')}}catch(e){showToast('更新失败: '+e.message,'error')}},
-        refreshTokens=async()=>{await loadTokens();await loadStats()},
+        refreshTokens=async()=>{
+            // 打印选中的Token ID
+            const selectedCheckboxes = document.querySelectorAll('.token-checkbox:checked');
+            const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+            if (selectedIds.length > 0) {
+                console.log("选中的Token ID:", selectedIds.join(", "));
+                await batchRefreshTokens(selectedIds);
+            }
+
+            // 原有的刷新功能
+            console.log("刷新"); 
+            loadTokens();
+            await loadStats();
+        },
+
+        // 批量刷新Token的AT
+        batchRefreshTokens=async(tokenIds)=>{
+            showToast(`正在刷新 ${tokenIds.length} 个Token的AT...`, 'info');
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const id of tokenIds) {
+                try {
+                    const r = await apiRequest(`/api/tokens/${id}/refresh-at`, {method: 'POST'});
+                    if (!r) {
+                        failCount++;
+                        continue;
+                    }
+                    const d = await r.json();
+                    if (d.success) {
+                        successCount++;
+                        console.log(`Token ${id} AT刷新成功`);
+                    } else {
+                        failCount++;
+                        console.error(`Token ${id} AT刷新失败:`, d.detail || '未知错误');
+                    }
+                } catch (e) {
+                    failCount++;
+                    console.error(`Token ${id} AT刷新异常:`, e.message);
+                }
+            }
+
+            if (successCount > 0) {
+                showToast(`AT刷新完成: 成功 ${successCount} 个, 失败 ${failCount} 个`, 'success');
+            } else {
+                showToast(`AT刷新失败: 所有 ${failCount} 个Token刷新失败`, 'error');
+            }
+        },
+
+        // 全选/取消全选功能
+        toggleSelectAll=()=>{
+            const selectAllCheckbox = $('selectAllTokens');
+            const tokenCheckboxes = document.querySelectorAll('.token-checkbox');
+
+            tokenCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        },
+
+        // 更新全选框状态
+        updateSelectAllStatus=()=>{
+            const selectAllCheckbox = $('selectAllTokens');
+            const tokenCheckboxes = document.querySelectorAll('.token-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.token-checkbox:checked');
+
+            // 如果没有Token，不更新全选框状态
+            if (tokenCheckboxes.length === 0) {
+                return;
+            }
+
+            // 如果所有Token都被选中，则全选框也选中
+            // 如果有Token未被选中，则全选框不选中
+            selectAllCheckbox.checked = tokenCheckboxes.length === checkedCheckboxes.length;
+        },
+
         openAddModal=()=>$('addModal').classList.remove('hidden'),
         closeAddModal=()=>{$('addModal').classList.add('hidden');$('addTokenST').value='';$('addTokenRemark').value='';$('addTokenProjectId').value='';$('addTokenProjectName').value='';$('addTokenImageEnabled').checked=true;$('addTokenVideoEnabled').checked=true;$('addTokenImageConcurrency').value='-1';$('addTokenVideoConcurrency').value='-1'},
         openEditModal=(id)=>{const token=allTokens.find(t=>t.id===id);if(!token)return showToast('Token不存在','error');$('editTokenId').value=token.id;$('editTokenST').value=token.st||'';$('editTokenRemark').value=token.remark||'';$('editTokenProjectId').value=token.current_project_id||'';$('editTokenProjectName').value=token.current_project_name||'';$('editTokenImageEnabled').checked=token.image_enabled!==false;$('editTokenVideoEnabled').checked=token.video_enabled!==false;$('editTokenImageConcurrency').value=token.image_concurrency||'-1';$('editTokenVideoConcurrency').value=token.video_concurrency||'-1';$('editModal').classList.remove('hidden')},
@@ -575,7 +654,7 @@
         loadGenerationTimeout=async()=>{try{console.log('开始加载生成超时配置...');const r=await apiRequest('/api/generation/timeout');if(!r){console.error('API请求失败');return}const d=await r.json();console.log('生成超时配置数据:',d);if(d.success&&d.config){const imageTimeout=d.config.image_timeout||300;const videoTimeout=d.config.video_timeout||1500;console.log('设置图片超时:',imageTimeout);console.log('设置视频超时:',videoTimeout);$('cfgImageTimeout').value=imageTimeout;$('cfgVideoTimeout').value=videoTimeout;console.log('生成超时配置加载成功')}else{console.error('生成超时配置数据格式错误:',d)}}catch(e){console.error('加载生成超时配置失败:',e);showToast('加载生成超时配置失败: '+e.message,'error')}},
         saveCacheConfig=async()=>{const enabled=$('cfgCacheEnabled').checked,timeout=parseInt($('cfgCacheTimeout').value)||7200,baseUrl=$('cfgCacheBaseUrl').value.trim();console.log('保存缓存配置:',{enabled,timeout,baseUrl});if(timeout<60||timeout>86400)return showToast('缓存超时时间必须在 60-86400 秒之间','error');if(baseUrl&&!baseUrl.startsWith('http://')&&!baseUrl.startsWith('https://'))return showToast('域名必须以 http:// 或 https:// 开头','error');try{console.log('保存缓存启用状态...');const r0=await apiRequest('/api/cache/enabled',{method:'POST',body:JSON.stringify({enabled:enabled})});if(!r0){console.error('保存缓存启用状态请求失败');return}const d0=await r0.json();console.log('缓存启用状态保存结果:',d0);if(!d0.success){console.error('保存缓存启用状态失败:',d0);return showToast('保存缓存启用状态失败','error')}console.log('保存超时时间...');const r1=await apiRequest('/api/cache/config',{method:'POST',body:JSON.stringify({timeout:timeout})});if(!r1){console.error('保存超时时间请求失败');return}const d1=await r1.json();console.log('超时时间保存结果:',d1);if(!d1.success){console.error('保存超时时间失败:',d1);return showToast('保存超时时间失败','error')}console.log('保存域名...');const r2=await apiRequest('/api/cache/base-url',{method:'POST',body:JSON.stringify({base_url:baseUrl})});if(!r2){console.error('保存域名请求失败');return}const d2=await r2.json();console.log('域名保存结果:',d2);if(d2.success){showToast('缓存配置保存成功','success');console.log('等待配置文件写入完成...');await new Promise(r=>setTimeout(r,200));console.log('重新加载配置...');await loadCacheConfig()}else{console.error('保存域名失败:',d2);showToast('保存域名失败','error')}}catch(e){console.error('保存失败:',e);showToast('保存失败: '+e.message,'error')}},
         saveGenerationTimeout=async()=>{const imageTimeout=parseInt($('cfgImageTimeout').value)||300,videoTimeout=parseInt($('cfgVideoTimeout').value)||1500;console.log('保存生成超时配置:',{imageTimeout,videoTimeout});if(imageTimeout<60||imageTimeout>3600)return showToast('图片超时时间必须在 60-3600 秒之间','error');if(videoTimeout<60||videoTimeout>7200)return showToast('视频超时时间必须在 60-7200 秒之间','error');try{const r=await apiRequest('/api/generation/timeout',{method:'POST',body:JSON.stringify({image_timeout:imageTimeout,video_timeout:videoTimeout})});if(!r){console.error('保存请求失败');return}const d=await r.json();console.log('保存结果:',d);if(d.success){showToast('生成超时配置保存成功','success');await new Promise(r=>setTimeout(r,200));await loadGenerationTimeout()}else{console.error('保存失败:',d);showToast('保存失败','error')}}catch(e){console.error('保存失败:',e);showToast('保存失败: '+e.message,'error')}},
-        toggleATAutoRefresh=async()=>{try{const enabled=$('atAutoRefreshToggle').checked;const r=await apiRequest('/api/token-refresh/enabled',{method:'POST',body:JSON.stringify({enabled:enabled})});if(!r){$('atAutoRefreshToggle').checked=!enabled;return}const d=await r.json();if(d.success){showToast(enabled?'AT自动刷新已启用':'AT自动刷新已禁用','success')}else{showToast('操作失败: '+(d.detail||'未知错误'),'error');$('atAutoRefreshToggle').checked=!enabled}}catch(e){showToast('操作失败: '+e.message,'error');$('atAutoRefreshToggle').checked=!enabled}},
+        toggleATAutoRefresh=async()=>{try{const enabled=$('atAutoRefreshToggle').checked;console.log("自动刷新"); const r=await apiRequest('/api/token-refresh/enabled',{method:'POST',body:JSON.stringify({enabled:enabled})});if(!r){$('atAutoRefreshToggle').checked=!enabled;return}const d=await r.json();if(d.success){showToast(enabled?'AT自动刷新已启用':'AT自动刷新已禁用','success')}else{showToast('操作失败: '+(d.detail||'未知错误'),'error');$('atAutoRefreshToggle').checked=!enabled}}catch(e){showToast('操作失败: '+e.message,'error');$('atAutoRefreshToggle').checked=!enabled}},
         loadATAutoRefreshConfig=async()=>{try{const r=await apiRequest('/api/token-refresh/config');if(!r)return;const d=await r.json();if(d.success&&d.config){$('atAutoRefreshToggle').checked=d.config.at_auto_refresh_enabled||false}else{console.error('AT自动刷新配置数据格式错误:',d)}}catch(e){console.error('加载AT自动刷新配置失败:',e)}},
         loadLogs=async()=>{try{const r=await apiRequest('/api/logs?limit=100');if(!r)return;const logs=await r.json();const tb=$('logsTableBody');tb.innerHTML=logs.map(l=>`<tr><td class="py-2.5 px-3">${l.operation}</td><td class="py-2.5 px-3"><span class="text-xs ${l.token_email?'text-blue-600':'text-muted-foreground'}">${l.token_email||'未知'}</span></td><td class="py-2.5 px-3"><span class="inline-flex items-center rounded px-2 py-0.5 text-xs ${l.status_code===200?'bg-green-50 text-green-700':'bg-red-50 text-red-700'}">${l.status_code}</span></td><td class="py-2.5 px-3">${l.duration.toFixed(2)}</td><td class="py-2.5 px-3 text-xs text-muted-foreground">${l.created_at?new Date(l.created_at).toLocaleString('zh-CN'):'-'}</td></tr>`).join('')}catch(e){console.error('加载日志失败:',e)}},
         refreshLogs=async()=>{await loadLogs()},

@@ -35,3 +35,6 @@ error_ban_threshold = 3
 enabled = false
 timeout = 7200  # 缓存超时时间(秒), 默认2小时
 base_url = ""   # 缓存文件访问的基础URL, 留空则使用服务器地址
+
+[token_refresh]
+interval = 3600  # 令牌刷新间隔(秒), 默认1小时

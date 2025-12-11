@@ -140,6 +140,14 @@ class DebugConfig(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class TokenRefreshConfig(BaseModel):
+    """Token refresh configuration"""
+    id: int = 1
+    at_auto_refresh_enabled: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
 # OpenAI Compatible Request Models
 class ChatMessage(BaseModel):
     """Chat message"""

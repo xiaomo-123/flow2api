@@ -43,6 +43,18 @@ class FlowClient:
         """
         proxy_url = await self.proxy_manager.get_proxy_url()
 
+        # 打印代理使用情况和数据
+        proxy_info = await self.proxy_manager.get_proxy_info()
+        print(f"[代理] 状态: {proxy_info['status']}")
+        if proxy_info['enabled']:
+            print(f"[代理] 地址: {proxy_info['proxy_url']}")
+            print(f"[代理] 请求URL: {url}")
+            print(f"[代理] 请求方法: {method}")
+        else:
+            print("[代理] 未使用代理")
+            print(f"[请求] 请求URL: {url}")
+            print(f"[请求] 请求方法: {method}")
+
         if headers is None:
             headers = {}
 
@@ -94,6 +106,14 @@ class FlowClient:
 
                 duration_ms = (time.time() - start_time) * 1000
 
+                # 打印代理响应数据
+                if proxy_info['enabled']:
+                    print(f"[代理] 响应状态码: {response.status_code}")
+                    print(f"[代理] 响应时间: {duration_ms:.2f}ms")
+                else:
+                    print(f"[请求] 响应状态码: {response.status_code}")
+                    print(f"[请求] 响应时间: {duration_ms:.2f}ms")
+
                 # Log response
                 if config.debug_enabled:
                     debug_logger.log_response(
@@ -109,6 +129,14 @@ class FlowClient:
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
             error_msg = str(e)
+
+            # 打印代理错误数据
+            if proxy_info['enabled']:
+                print(f"[代理] 请求失败: {error_msg}")
+                print(f"[代理] 失败时间: {duration_ms:.2f}ms")
+            else:
+                print(f"[请求] 请求失败: {error_msg}")
+                print(f"[请求] 失败时间: {duration_ms:.2f}ms")
 
             if config.debug_enabled:
                 debug_logger.log_error(
@@ -141,6 +169,7 @@ class FlowClient:
             use_st=True,
             st_token=st
         )
+        print(f"st_to_at result: {result}")
         return result
 
     # ========== 项目管理 (使用ST) ==========
